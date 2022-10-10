@@ -8,7 +8,7 @@ In the beginning only regression techniques will be covered, however in later on
 
 ### 1. My bachelor thesis (praca licencjacka) - **Nonlinear time series forecasting with selected econometric and machine learning models**. 
 
-It is a comparison between econometric (AR, ARMA, SETAR) and machine learning (KNN, Decision Tree and Random Forest) models in context of specifically nonlinear time series. 
+It is a comparison between econometric **(AR, ARMA, SETAR)** and machine learning **(KNN, Decision Tree and Random Forest)** models in context of specifically nonlinear time series. 
 What I believe **my thesis does differently than most of the existing research on this topic is the validation method** - I have used Sliding Window Cross-Validation with retraining after every step during both training and actual forecasting.
 Detailed statistical properties of the residuals are covered.
 
