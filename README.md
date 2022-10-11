@@ -14,10 +14,13 @@ Detailed statistical properties of the residuals are covered.
 
 ### 2. **Modeling consumer inflation** 
 
-This is an experimental research trying to establish whether ARIMA or SARIMA models are able to successfully model CPI in the US since 2010 till today (10.10.2022). 
+This is an experimental research trying to establish whether it is possible to model the american CPI with econometric and/or machine learning algorithms. 
 **Modelling inflation is not a simple task, so this project will be continued** and will extend the models used to more and more advanced ones - 
 if you're not dealing with nTSA on your daily basis, it's likely you will see something new! I hate repetitive notebooks, so I will do my best to keep it interesting. 
 Stay tuned!
+
+1. Basic EDA and SARIMA *(CPI.ipynb)*
+2. Structural break analysis and shortening the data *(CPI_short.ipynb)*
 
 ### 3. Comparison in traditional TSA Exploratory Data Analysis 
 
