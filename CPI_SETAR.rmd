@@ -1,0 +1,182 @@
+---
+title: "Nonlinear estimation"
+output: html_document
+---
+
+Alright, so far we have done linear estimation. Now it's about time to check for nonlinear models. Let's start off with loading the data:
+
+```{r}
+library(aTSA)
+library(tsDyn)
+library(nonlinearTseries)
+library(DescTools)
+library(rcompanion)
+
+data <- read.csv("cpi.csv")
+ndata <- data.frame(
+  cpi = data$X0_cpi,
+  ppi = data$X0_ppi
+)
+
+data <- data.frame(
+  cpi = diff(data$X0_cpi, 1),
+  ppi = diff(data$X0_ppi, 1)
+)
+plot(data$cpi, type='l')
+```
+
+And for the sake of the future inference, let's review our linear autocorrelation analysis:
+
+```{r}
+{ par(mfrow=c(2,1))
+  pacf(data$cpi)
+  acf(data$cpi)}
+```
+
+By the look, it seems to be an AR(1) process. Let's check the residuals from it:
+
+```{r}
+{ par(mfrow = c(2, 1))
+  acf(arima(data$cpi, order = c(1, 0, 0))$residuals, main = "residuals")
+  acf(arima(data$cpi, order = c(1, 0, 0))$residuals^2, main = "squared residuals") }
+```
+
+The series is not serially autocorrelated, but it shows conditional heteroskedasticity (also, at 12th lag there's a significant autocorrelation, but we ignore SAR processes here). Now, let's see what the fit of this model empirically looks like:
+
+```{r}
+{ plot(data$cpi, type='b')
+  points(fitted(arima(data$cpi, order = c(1, 0, 0))), col='red', type='b') }
+```
+The fitted values are obviously delayed - which is a good forecast in the meaning of minimizing the error function - however it almost does not provide any useful information but for what we already know since the fitted value look similar to naive forecast.
+
+In order to check whether anything can be improved I suggest using Mutual Information to the residuals of the best linear model to see, whether there is anything more to make a forecast from:
+```{r}
+mutualInformation(arima(data$cpi, order = c(1,0,0))$residuals)
+```
+
+As anticipated, mutual information seems to increase with lag up to the 4th lag. In the next step, we're going to see the MI for the CPI returns:
+
+```{r}
+mutualInformation(data$cpi)
+```
+
+The MI for CPI data seems to cross 0 at the 5th lag for the first time, therefore, the embedding dimension is hereby established as m=4. For the sake of formality we're going to check if the nonlinear SETAR model is better than our previously estimated AR(1). The hypotheses for this tests are:
+
+H0: The process is an AR process
+H1: The process is a TAR process
+
+```{r}
+
+result <- data.frame()
+
+maxp <- 10
+maxd <- 4
+for (p in 1:maxp){
+  for (d in 1:maxd){
+    result[as.character(p), paste("d: ", as.character(d))] <- thresholdTest(data$cpi, p=p, d=d)$p.value
+  }
+}
+
+print(result)
+
+```
+
+At the 1st lag and 1st delay, it seems that AR model is just fine, however the further we go the more a nonlinear SETAR seems to be more fit. In order to estimate the best model, we're going to gridsearch the parameters:
+
+```{r}
+selectSETAR(data$cpi, thDelay = c(0,1,2,3,4), m=5, criterion = 'pooled-AIC')
+
+```
+
+The best model seems to be a SETAR(2,2,1) with threshold at the level of 0.059. Now, we're going to estimate it and do the residual analysis:
+
+```{r}
+mod.setar_paic <- setar(data$cpi, mL=2, mH=1, thDelay = 1, th=0.059218285575699)
+plot(mod.setar_paic)
+```
+
+The residuals seem to be distributed independently on time, they do not exhibit autocorrelation nor partial autocorrelation, the MI of the residuals is lower than the one of the process, but it's added some variability to the 6th and 15th lags. The threshold is well fit within the trim.
+
+Now let's take a look at the fitted values:
+
+```{r}
+{ plot(data$cpi[3:149], type='b')
+  points(mod.setar_paic$fitted.values, col='red', type='b') }
+```
+
+The dynamics of the process seems to be slightly better described by SETAR(2,2,1) model than AR(1). Let's check it's summary and proceed to residual analysis:
+
+```{r}
+summary(mod.setar_paic)
+```
+
+There is no unit root within any of the regimes, the estimated process is strictly stationary. All the variables are statistically significant except for the constant in the high regime - the parameter is very low however, so I'm letting it be.
+
+Now let's take a look at potential conditional heteroskedasticity:
+
+```{r}
+{ par(mfrow = c(2, 1))
+  acf(mod.setar_paic$residuals^2, main = "residuals")
+  pacf(mod.setar_paic$residuals^2, main = "squared residuals") }
+```
+
+Unfortunately, the process does seem to exhibit some kind of ARCH effect - which means that this model - however better than AR(1) - is still not enough for the data we have. In the next step we're going to do the same analysis, but with BIC instead of pooled-AIC:
+
+```{r}
+selectSETAR(data$cpi, thDelay = c(0,1,2,3,4), m=5, criterion = 'BIC')
+```
+
+```{r}
+mod.setar_bic <- setar(data$cpi, mL=2, mH=1, thDelay = 3, th=0.0763245273783824)
+plot(mod.setar_bic)
+```
+This time the MI of the residuals seems to be worse, and the threshold is above the trim. Let's take a look at the summary:
+```{r}
+summary(mod.setar_bic)
+```
+
+There is one significant difference between the pooled-AIC and BIC driven models - this time the phi coefficient for the high regime is greater than one - which means that for all the values above 0.76 the process is locally nonstationary. And that seems to well fit to the economic theory of speculation bubbles and their explosive behaviour. Because what we're dealing with is clearly a bubble-type behaviour I accept the local nonstationarity.
+
+Let's check for conditional heteroskedasticity:
+
+```{r}
+{ par(mfrow = c(2, 1))
+  acf(mod.setar_bic$residuals^2, main = "residuals")
+  pacf(mod.setar_bic$residuals^2, main = "squared residuals") }
+```
+There is a significant correlation at the 3rd lag, but I think this is an improvement compared to the AIC-based model.
+Let's take a look at the fit:
+
+
+```{r}
+{par(mfrow=c(2,1))
+plot(data$cpi[3:149], type='b', main = "Pooled-AIC")
+points(mod.setar_paic$fitted.values, type='b', col='red')
+
+plot(data$cpi[5:149], type='b', main = "BIC")
+points(mod.setar_bic$fitted.values, type='b', col='red')}
+```
+Both models are quite similar, however you can notice that the BIC-based model seems to better describe the dynamics of the recent extreme values. For the sake of formality let's take a look at the distribution of the residuals of both models:
+```{r}
+{ par(mfrow = c(1, 2))
+  plotNormalHistogram(residuals(mod.setar_paic), main="Pooled-AIC")
+  plotNormalHistogram(residuals(mod.setar_bic), main="BIC") }
+```
+Both seem to be slightly asymmetric with an extreme mode, but the distributions don't seem non-gaussian.
+
+Let's take a look at the Theil's coefficients:
+```{r}
+print(TheilU(data$cpi[3:149], mod.setar_paic$fitted.values, type = 1, na.rm = FALSE))
+print(TheilU(data$cpi[3:149], mod.setar_paic$fitted.values, type = 2, na.rm = FALSE))
+
+print(TheilU(data$cpi[5:149], mod.setar_bic$fitted.values, type = 1, na.rm = FALSE))
+print(TheilU(data$cpi[5:149], mod.setar_bic$fitted.values, type = 2, na.rm = FALSE))
+```
+
+Theil's coefficients also suggest better fit with the BIC-based model, but the difference is very small and the length of the series is slightly different, so I say it's only another indication that the BIC-based model is the preferred one.
+
+Quick summary:
+
+1. We have fit an AR(1) model and checked its autocorrelations
+2. We have established 2 SETAR models basing on pooled-AIC and BIC
+3. We have checked their residuals and decided that the BIC driven approach seems to be slightly better despite being locally nonstationary
