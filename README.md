@@ -21,6 +21,7 @@ Stay tuned!
 
 1. Basic EDA and SARIMA *(CPI.ipynb)*
 2. Structural break analysis and shortening the data *(CPI_short.ipynb)*
+3. Fitting nonlinear SETAR model to the whole dataset *(CPI_SETAR.html)*
 
 ### 3. Comparison in traditional TSA Exploratory Data Analysis 
 
